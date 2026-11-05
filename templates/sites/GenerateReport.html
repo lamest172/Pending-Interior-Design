@@ -1,0 +1,29 @@
+{% extends "master.html" %}
+
+{% block title %}Generate Report{% endblock %}
+
+{% block content %}
+<section class="PlatformManagers Dashboard">
+    <section class="hero">
+        <h1>Generate Report</h1>
+    </section>  
+    
+    <section class="section">
+        <h2>Generate Reports</h2>
+        <p class="intro">Generate Reports here</p>
+        <form class="form">
+            <fieldset>
+                <dropdown>
+                    <label for="reportType">Select Report Type:</label>
+                    <select id="reportType" name="reportType">
+                        {% for type in report_types %}<option value="{{ type }}">{{ type.title() }}</option>{% endfor %}
+                    </select>
+                </dropdown><br>
+                <label for="startDate">Select Start Date:</label>
+                <input type="date" id="startDate" name="startDate" value="{{ default_date }}" required><br>
+                <submit class="button" type="submit" id="generateReportBtn">Generate Report</submit>
+            </fieldset>
+        </form>
+    </section>  
+</section>
+{% endblock %}

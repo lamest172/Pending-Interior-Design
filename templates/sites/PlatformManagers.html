@@ -1,0 +1,22 @@
+{% extends "master.html" %}
+
+{% block title %}Platform Managers Dashboard{% endblock %}
+
+{% block content %}
+<section class="PlatformManagers Dashboard">
+    <section class="hero">
+        <h1>Platform Managers Dashboard</h1>
+        <p class="intro">Generate and export reports here</p>
+    </section>  
+    
+    <section class="section">
+        <h2>Generate Reports</h2>
+        <a class="button" href="{{url_for('generate_report')}}">Generate Here</a>
+    </section>  
+
+    <section class="section">
+        <h2>Export Reports</h2>
+        <a class="button" href="{{url_for('export_report')}}">Export Here</a>
+    </section>  
+</section>
+{% endblock %}

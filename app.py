@@ -1,5 +1,6 @@
 import os
 from flask import Flask, render_template, session, request, redirect
+from datetime import datetime
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('FLASK_KEY')
@@ -37,6 +38,24 @@ def signup():
 @app.route('/Projects')
 def projects():
     return render_template('sites/Main.html')
+
+@app.route('/PlatformManagers')
+def platform_managers():
+    return render_template("sites/PlatformManagers.html")
+
+@app.route('/GenerateReport')
+def generate_report():
+    report_types = [
+            "daily report",
+            "weekly report",
+            "monthly report"
+        ]
+    today_date = datetime.today().strftime('%Y-%m-%d')
+    return render_template("sites/GenerateReport.html",report_types=report_types, default_date=today_date)
+
+@app.route('/ExportReport')
+def export_report():
+    return render_template("sites/ExportReport.html")
 
 @app.route('/About')
 def about():
