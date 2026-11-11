@@ -1,5 +1,9 @@
 """Local SQLite persistence for the Pending demo (no online database required)."""
 import os
+import re
+import hashlib
+import hmac
+import secrets
 import sqlite3
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -51,6 +55,32 @@ def init_db():
                 project_id INTEGER NOT NULL, image_url TEXT NOT NULL, photo_type TEXT NOT NULL,
                 FOREIGN KEY(project_id) REFERENCES interior_design_project(id)
             );
+            CREATE TABLE IF NOT EXISTS user_accounts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                full_name TEXT NOT NULL,
+                email TEXT NOT NULL UNIQUE COLLATE NOCASE,
+                password_hash TEXT NOT NULL,
+                role TEXT NOT NULL CHECK (role IN ('customer','designer','platform_manager','admin')),
+                status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','suspended')),
+                is_verified INTEGER NOT NULL DEFAULT 0,
+                verified_at TEXT NOT NULL DEFAULT '',
+                is_seeded INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                last_login_at TEXT DEFAULT ''
+            );
+            CREATE TABLE IF NOT EXISTS demo_meta (
+                name TEXT PRIMARY KEY, value TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS admin_action_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                admin_id INTEGER NOT NULL,
+                target_email TEXT NOT NULL,
+                action TEXT NOT NULL,
+                occurred_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_user_account_role ON user_accounts(role);
+            CREATE INDEX IF NOT EXISTS idx_user_account_status ON user_accounts(status);
             CREATE TABLE IF NOT EXISTS demo_users (
                 account_key TEXT PRIMARY KEY, email TEXT NOT NULL DEFAULT '',
                 role TEXT NOT NULL, created_at TEXT NOT NULL, last_login_at TEXT NOT NULL,
@@ -79,9 +109,20 @@ def init_db():
         for column in ('created_at', 'updated_at'):
             if column not in existing:
                 conn.execute(f"ALTER TABLE interior_design_project ADD COLUMN {column} TEXT NOT NULL DEFAULT ''")
+        account_columns = {c['name'] for c in conn.execute('PRAGMA table_info(user_accounts)')}
+        if 'is_verified' not in account_columns:
+            conn.execute('ALTER TABLE user_accounts ADD COLUMN is_verified INTEGER NOT NULL DEFAULT 0')
+        if 'verified_at' not in account_columns:
+            conn.execute("ALTER TABLE user_accounts ADD COLUMN verified_at TEXT NOT NULL DEFAULT ''")
+        # Existing customers/managers/admins need no designer verification.
+        conn.execute("UPDATE user_accounts SET is_verified=1 WHERE role != 'designer' AND is_verified=0")
+        project_columns = {c['name'] for c in conn.execute('PRAGMA table_info(interior_design_project)')}
+        if 'designer_id' not in project_columns:
+            conn.execute('ALTER TABLE interior_design_project ADD COLUMN designer_id INTEGER')
         count = conn.execute('SELECT COUNT(*) AS n FROM interior_design_project').fetchone()['n']
         if count == 0:
             _seed_demo_projects(conn)
+        _seed_account_catalog_once(conn)
 
 
 def _seed_demo_projects(conn):
@@ -107,6 +148,212 @@ def _seed_demo_projects(conn):
           idx,(title,desc,category,style,prop,rooms,apartment) in enumerate(samples)])
 
 
+# ── Local account authentication and admin account maintenance ───────────────
+# SHA-256 PBKDF2 with a random per-account salt; never store plaintext passwords.
+PASSWORD_ITERATIONS = 260_000
+
+
+def hash_password(password):
+    salt = secrets.token_bytes(16)
+    digest = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt, PASSWORD_ITERATIONS)
+    return f'pbkdf2_sha256${PASSWORD_ITERATIONS}${salt.hex()}${digest.hex()}'
+
+
+def check_password(stored, password):
+    try:
+        name, iterations, salt_hex, expected_hex = stored.split('$', 3)
+        if name != 'pbkdf2_sha256':
+            return False
+        computed = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), bytes.fromhex(salt_hex), int(iterations))
+        return hmac.compare_digest(computed, bytes.fromhex(expected_hex))
+    except (ValueError, TypeError, AttributeError):
+        return False
+
+
+def _create_account_in_conn(conn, name, email, password, role, status='active', seeded=False, verified=None):
+    if role not in ('customer', 'designer', 'platform_manager', 'admin'):
+        raise ValueError('Invalid account role.')
+    if status not in ('active', 'suspended'):
+        raise ValueError('Invalid status.')
+    name, email = (name or '').strip(), (email or '').strip().lower()
+    if not name or len(name) > 100 or len(email) > 150 or not re.fullmatch(r'[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}', email):
+        raise ValueError('Enter a valid full name and email address.')
+    if len(password or '') < 8:
+        raise ValueError('Password must be at least 8 characters.')
+    stamp = now_sg()
+    # New designer registrations require admin verification before appearing publicly.
+    approved = (role != 'designer') if verified is None else bool(verified)
+    try:
+        cur = conn.execute('''INSERT INTO user_accounts
+            (full_name,email,password_hash,role,status,is_verified,verified_at,is_seeded,created_at,updated_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?)''',
+            (name, email, hash_password(password), role, status, int(approved),
+             stamp if approved and role == 'designer' else '', int(seeded), stamp, stamp))
+    except sqlite3.IntegrityError as error:
+        raise ValueError('That email address already has an account.') from error
+    return cur.lastrowid
+
+
+def _seed_account_catalog_once(conn):
+    # The marker matters: deleting a demo user must not recreate it at startup.
+    if conn.execute("SELECT 1 FROM demo_meta WHERE name='seeded_accounts_v1'").fetchone():
+        return
+    existing = conn.execute('SELECT COUNT(*) FROM user_accounts').fetchone()[0]
+    if existing == 0:
+        for i in range(1, 16):
+            _create_account_in_conn(conn, f'Demo Customer {i:03}', f'customer{i:03}@example.com',
+                                    'DemoPass123!', 'customer', seeded=True)
+        for i in range(1, 5):
+            # Two verified and two awaiting review to demonstrate the approval flow.
+            _create_account_in_conn(conn, f'Demo Designer {i:03}', f'designer{i:03}@example.com',
+                                    'DemoPass123!', 'designer', seeded=True, verified=(i <= 2))
+        _create_account_in_conn(conn, 'Demo Platform Manager', 'manager001@example.com',
+                                'DemoPass123!', 'platform_manager', seeded=True)
+        _create_account_in_conn(conn, 'Demo Administrator', 'admin@example.com',
+                                'AdminDemo123!', 'admin', seeded=True)
+    elif not conn.execute("SELECT 1 FROM user_accounts WHERE role='admin' LIMIT 1").fetchone():
+        _create_account_in_conn(conn, 'Demo Administrator', 'admin@example.com',
+                                'AdminDemo123!', 'admin', seeded=True)
+    conn.execute("INSERT INTO demo_meta (name,value) VALUES ('seeded_accounts_v1','yes')")
+
+
+def create_user_account(name, email, password, role='customer'):
+    # The public signup and admin creation endpoints never issue the 'admin' role.
+    if role not in ('customer', 'designer', 'platform_manager'):
+        raise ValueError('Invalid role.')
+    with get_db() as conn:
+        return _create_account_in_conn(conn, name, email, password, role)
+
+
+def get_user_by_id(user_id):
+    with get_db() as conn:
+        r = conn.execute('SELECT * FROM user_accounts WHERE id=?', (user_id,)).fetchone()
+        return dict(r) if r else None
+
+
+def authenticate_user(email, password, requested_role=None):
+    with get_db() as conn:
+        r = conn.execute('SELECT * FROM user_accounts WHERE email=?', ((email or '').strip().lower(),)).fetchone()
+        if not r or not check_password(r['password_hash'], password or ''):
+            return None
+        if requested_role and r['role'] != requested_role:
+            return None
+        # Return the user even if suspended, so the login page can explain the status.
+        return dict(r)
+
+
+def record_user_login(user_id):
+    with get_db() as conn:
+        conn.execute('UPDATE user_accounts SET last_login_at=? WHERE id=?', (now_sg(),user_id))
+
+
+def list_user_accounts(query='', role='', status=''):
+    sql = '''SELECT id,full_name,email,role,status,is_verified,verified_at,is_seeded,created_at,last_login_at
+             FROM user_accounts WHERE 1=1'''
+    params = []
+    if query:
+        sql += ' AND (full_name LIKE ? OR email LIKE ?)'
+        params.extend([f'%{query}%',f'%{query}%'])
+    if role in ('customer','designer','platform_manager','admin'):
+        sql += ' AND role=?';params.append(role)
+    if status in ('active','suspended'):
+        sql += ' AND status=?';params.append(status)
+    sql += " ORDER BY CASE role WHEN 'admin' THEN 0 ELSE 1 END, id"
+    with get_db() as conn:
+        return [dict(r) for r in conn.execute(sql,params)]
+
+
+def get_account_counts():
+    with get_db() as conn:
+        counts = {r['status']:r['n'] for r in conn.execute('SELECT status, COUNT(*) n FROM user_accounts GROUP BY status')}
+        pending = conn.execute('''SELECT COUNT(*) FROM user_accounts
+            WHERE role='designer' AND is_verified=0''').fetchone()[0]
+        verified = conn.execute('''SELECT COUNT(*) FROM user_accounts
+            WHERE role='designer' AND is_verified=1 AND status='active' ''').fetchone()[0]
+        return {'total':sum(counts.values()),'active':counts.get('active',0),
+                'suspended':counts.get('suspended',0),
+                'pending_designers':pending,'live_designers':verified}
+
+
+def list_pending_designers():
+    with get_db() as conn:
+        return [dict(r) for r in conn.execute('''SELECT id,full_name,email,status,created_at
+            FROM user_accounts WHERE role='designer' AND is_verified=0
+            ORDER BY created_at,id''')]
+
+
+def list_public_designers():
+    """Only approved AND unsuspended designers are publicly discoverable."""
+    with get_db() as conn:
+        return [dict(r) for r in conn.execute('''SELECT id,full_name,created_at
+            FROM user_accounts WHERE role='designer' AND is_verified=1 AND status='active'
+            ORDER BY full_name''')]
+
+
+def verify_designer(user_id, admin_id):
+    """Separate approval from account suspension; suspension always wins."""
+    with get_db() as conn:
+        user = conn.execute('SELECT id,email,role,is_verified FROM user_accounts WHERE id=?',(user_id,)).fetchone()
+        if not user or user['role'] != 'designer':
+            raise ValueError('Only Interior Designer accounts can be verified.')
+        if user['is_verified']:
+            raise ValueError('This designer has already been verified.')
+        conn.execute('''UPDATE user_accounts SET is_verified=1, verified_at=?, updated_at=?
+            WHERE id=?''',(now_sg(),now_sg(),user_id))
+        _audit(conn,admin_id,user['email'],'Verified designer')
+
+
+def is_project_public(project_id):
+    with get_db() as conn:
+        return bool(conn.execute('''SELECT 1 FROM interior_design_project p
+           WHERE p.id=? AND p.is_visible=1 AND
+             (p.designer_id IS NULL OR EXISTS (
+                SELECT 1 FROM user_accounts u WHERE u.id=p.designer_id
+                AND u.role='designer' AND u.status='active' AND u.is_verified=1))''',
+            (project_id,)).fetchone())
+
+
+def can_manage_project(project_id, designer_id):
+    """Legacy seeded projects are shared demonstration examples."""
+    with get_db() as conn:
+        return bool(conn.execute('''SELECT 1 FROM interior_design_project
+            WHERE id=? AND (designer_id IS NULL OR designer_id=?)''',
+            (project_id, designer_id)).fetchone())
+
+
+def _audit(conn,admin_id,email,action):
+    conn.execute('INSERT INTO admin_action_log(admin_id,target_email,action,occurred_at) VALUES (?,?,?,?)',
+                 (admin_id,email,action,now_sg()))
+
+
+def change_user_status(user_id, new_status, admin_id):
+    if new_status not in ('active', 'suspended'):
+        raise ValueError('Invalid status.')
+    with get_db() as conn:
+        target = conn.execute('SELECT id,email,role,status FROM user_accounts WHERE id=?',(user_id,)).fetchone()
+        if not target:
+            raise ValueError('Account not found.')
+        if target['role'] == 'admin' or target['id'] == admin_id:
+            raise ValueError('Administrators cannot be suspended using this page.')
+        conn.execute('UPDATE user_accounts SET status=?,updated_at=? WHERE id=?',
+                     (new_status,now_sg(),user_id))
+        _audit(conn,admin_id,target['email'], 'Suspended' if new_status=='suspended' else 'Unsuspended')
+
+
+def remove_user_account(user_id, admin_id):
+    with get_db() as conn:
+        target = conn.execute('SELECT id,email,role FROM user_accounts WHERE id=?',(user_id,)).fetchone()
+        if not target:
+            raise ValueError('Account not found.')
+        if target['role'] == 'admin' or target['id'] == admin_id:
+            raise ValueError('Administrators cannot be removed using this page.')
+        key = f"{target['role']}:{target['email']}"
+        conn.execute('DELETE FROM favorite_project WHERE account_key=?',(key,))
+        conn.execute('DELETE FROM demo_users WHERE account_key=?',(key,))
+        conn.execute('DELETE FROM user_accounts WHERE id=?',(user_id,))
+        _audit(conn,admin_id,target['email'],'Removed')
+
+
 def get_company():
     with get_db() as conn:
         row = conn.execute('SELECT * FROM company_profile WHERE id=1').fetchone()
@@ -124,9 +371,20 @@ def get_all_projects():
         return [dict(r) for r in conn.execute('SELECT * FROM interior_design_project ORDER BY is_featured DESC,id DESC')]
 
 
+def get_designer_projects(designer_id):
+    # Existing sample projects are unowned and remain editable for the classroom demo.
+    with get_db() as conn:
+        return [dict(row) for row in conn.execute('''SELECT * FROM interior_design_project
+            WHERE designer_id IS NULL OR designer_id=?
+            ORDER BY is_featured DESC,id DESC''', (designer_id,))]
+
+
 def get_visible_projects(filters=None):
     filters = filters or {}
-    query = 'SELECT * FROM interior_design_project WHERE is_visible=1'
+    query = '''SELECT * FROM interior_design_project AS p WHERE p.is_visible=1
+      AND (p.designer_id IS NULL OR EXISTS (
+        SELECT 1 FROM user_accounts AS u WHERE u.id=p.designer_id
+          AND u.role='designer' AND u.status='active' AND u.is_verified=1))'''
     values = []
     for field in TAG_FIELDS:
         value = (filters.get(field) or '').strip()
@@ -152,7 +410,12 @@ def get_filter_options():
     options = {}
     with get_db() as conn:
         for field in TAG_FIELDS:  # predefined column names only
-            rows = conn.execute(f'SELECT DISTINCT {field} FROM interior_design_project WHERE is_visible=1 AND {field} != "" ORDER BY {field}').fetchall()
+            rows = conn.execute(f'''SELECT DISTINCT {field} FROM interior_design_project AS p
+                WHERE p.is_visible=1 AND {field} != ''
+                AND (p.designer_id IS NULL OR EXISTS (
+                    SELECT 1 FROM user_accounts u WHERE u.id=p.designer_id
+                    AND u.role='designer' AND u.status='active' AND u.is_verified=1))
+                ORDER BY {field}''').fetchall()
             options[field] = [r[0] for r in rows]
     return options
 
@@ -180,13 +443,13 @@ def record_activity(conn, event_type, project_id, project_title, account_key='de
                  (account_key, event_type, project_id, project_title, now_sg()))
 
 
-def create_project(title, description, category, style, property_type, room_count='', apartment_type='', actor='demo-designer'):
+def create_project(title, description, category, style, property_type, room_count='', apartment_type='', actor='demo-designer', designer_id=None):
     with get_db() as conn:
         timestamp = now_sg()
         cursor = conn.execute('''INSERT INTO interior_design_project
-            (title,description,category,style,property_type,room_count,apartment_type,created_at,updated_at)
-            VALUES (?,?,?,?,?,?,?,?,?)''',
-            (title,description,category,style,property_type,room_count,apartment_type,timestamp,timestamp))
+            (title,description,category,style,property_type,room_count,apartment_type,created_at,updated_at,designer_id)
+            VALUES (?,?,?,?,?,?,?,?,?,?)''',
+            (title,description,category,style,property_type,room_count,apartment_type,timestamp,timestamp,designer_id))
         project_id = cursor.lastrowid
         record_activity(conn, 'Created project',project_id,title,actor)
         return project_id
@@ -303,10 +566,11 @@ def get_project_stats():
 
 def get_user_stats(start, end):
     with get_db() as conn:
-        total = conn.execute('SELECT COUNT(*) FROM demo_users').fetchone()[0]
-        recent = conn.execute('SELECT COUNT(*) FROM demo_users WHERE created_at>=? AND created_at<?',(start,end)).fetchone()[0]
-        roles = {r['role']: r['n'] for r in conn.execute('SELECT role,COUNT(*) AS n FROM demo_users GROUP BY role')}
-        return {'total':total,'new_in_period':recent,'roles':{role:roles.get(role,0) for role in ('customer','designer','platform_manager')}}
+        total = conn.execute('SELECT COUNT(*) FROM user_accounts').fetchone()[0]
+        recent = conn.execute('SELECT COUNT(*) FROM user_accounts WHERE created_at>=? AND created_at<?',(start,end)).fetchone()[0]
+        roles = {r['role']: r['n'] for r in conn.execute('SELECT role,COUNT(*) AS n FROM user_accounts GROUP BY role')}
+        return {'total':total,'new_in_period':recent,
+                'roles':{role:roles.get(role,0) for role in ('customer','designer','platform_manager','admin')}}
 
 
 def get_designer_activity(start,end):

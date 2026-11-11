@@ -7,35 +7,40 @@
     <div class="login-card">
         <p class="eyebrow">Welcome back</p>
         <h1>Sign in to Pending</h1>
-        <p class="login-intro">Choose your account type to continue.</p>
+        <p class="login-intro">Choose an account type, then enter the matching email and password.</p>
 
-        <!-- Account selection is a visual placeholder until authentication is added. -->
+        <!-- Passwords are verified against hashed credentials in local SQLite. -->
         <form method="post" action="{{ url_for('login') }}">
-            <fieldset class="account-types">
+            <fieldset class="account-types login-account-grid">
                 <legend>I’m signing in as a</legend>
                 <label class="account-option">
-                    <input type="radio" name="account_type" value="customer" checked>
-                    <span><strong>Customer</strong><small>Explore designers and save projects</small></span>
+                    <input type="radio" name="account_type" value="customer" {% if selected_role == 'customer' %}checked{% endif %} required>
+                    <span><strong>Customer</strong><small>Explore and save projects</small></span>
                 </label>
                 <label class="account-option">
-                    <input type="radio" name="account_type" value="designer">
-                    <span><strong>Interior Designer</strong><small>Share projects and manage your profile</small></span>
+                    <input type="radio" name="account_type" value="designer" {% if selected_role == 'designer' %}checked{% endif %}>
+                    <span><strong>Interior Designer</strong><small>Manage your portfolio</small></span>
                 </label>
                 <label class="account-option">
-                    <input type="radio" name="account_type" value="platform_manager">
-                    <span><strong>Platform Manager</strong><small>Strategize, Develop, and Scale your organisation</small></span>
+                    <input type="radio" name="account_type" value="platform_manager" {% if selected_role == 'platform_manager' %}checked{% endif %}>
+                    <span><strong>Platform Manager</strong><small>View reports and statistics</small></span>
+                </label>
+                <label class="account-option account-option-admin">
+                    <input type="radio" name="account_type" value="admin" {% if selected_role == 'admin' %}checked{% endif %}>
+                    <span><strong>Administrator</strong><small>Suspend users and verify designers</small></span>
                 </label>
             </fieldset>
 
             <label class="login-label" for="email">Email address</label>
-            <input class="login-input" id="email" name="email" type="email" placeholder="you@example.com">
+            <input class="login-input" id="email" name="email" type="email" placeholder="you@example.com" value="{{ entered_email or '' }}" autocomplete="username" required>
 
             <label class="login-label" for="password">Password</label>
-            <input class="login-input" id="password" name="password" type="password" placeholder="Enter your password">
+            <input class="login-input" id="password" name="password" type="password" placeholder="Enter your password" autocomplete="current-password" required>
 
             <button class="button login-button" type="submit">Sign in</button>
         </form>
-        <p class="login-note">Demo only: picking a role registers a local demo identity. Passwords are not checked; please do not use real credentials.</p>
+        <p class="login-note">Administrator accounts open the protected User Administration dashboard after sign-in. Login details are in the project README.</p>
+        <p class="login-note"><a href="{{ url_for('signup') }}">Create a customer or designer account</a></p>
         <a class="back-link" href="{{ url_for('home') }}">← Back to exploring</a>
     </div>
 </section>
