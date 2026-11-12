@@ -23,3 +23,7 @@ Thumbs.db
 
 # Requirements.txt
 requirements.txt
+
+# Local User Admin development secret and backup files
+.pending-admin-secret
+*.before-admin.bak

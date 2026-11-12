@@ -1,89 +1,115 @@
 {% extends "master.html" %}
-{% block title %}User Admin | Pending{% endblock %}
+{% block title %}User Administration | Pending{% endblock %}
 {% block content %}
-<style>
-    .admin-page { max-width: 1150px; margin: 0 auto; padding: 42px 20px 70px; color: #263238; }
-    .admin-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 22px; }
-    .admin-header h1 { font-size: 2rem; font-weight: 750; margin: 0 0 6px; }
-    .admin-header p { margin: 0; color: #64748b; }
-    .admin-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 15px; margin-bottom: 25px; }
-    .admin-stat, .admin-panel { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; box-shadow: 0 5px 18px rgba(15,23,42,.04); }
-    .admin-stat { padding: 20px; }
-    .admin-stat span { color: #64748b; display: block; font-size: .9rem; }
-    .admin-stat strong { display: block; font-size: 1.9rem; margin-top: 5px; }
-    .admin-panel { padding: 24px; margin-bottom: 22px; }
-    .admin-panel h2 { font-size: 1.3rem; font-weight: 700; margin-bottom: 16px; }
-    .admin-form { display: grid; grid-template-columns: 1fr 1.4fr 1fr auto; gap: 12px; align-items: end; }
-    .admin-field label { display: block; font-size: .85rem; font-weight: 600; margin-bottom: 7px; }
-    .admin-field input, .admin-field select { width: 100%; border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px 12px; min-height: 42px; background: white; }
-    .admin-btn { border: 0; border-radius: 8px; padding: 9px 12px; font-weight: 600; cursor: pointer; font-size: .84rem; }
-    .admin-btn.add { background: #172554; color: #fff; min-height: 42px; }
-    .admin-btn.approve { background: #dcfce7; color: #166534; }
-    .admin-btn.block { background: #fef3c7; color: #92400e; }
-    .admin-btn.remove { background: #fee2e2; color: #991b1b; }
-    .admin-table-wrap { overflow-x: auto; }
-    .admin-table { width: 100%; border-collapse: collapse; min-width: 750px; }
-    .admin-table th { font-size: .8rem; text-transform: uppercase; letter-spacing: .05em; color: #64748b; background: #f8fafc; }
-    .admin-table th, .admin-table td { padding: 13px 12px; border-bottom: 1px solid #e2e8f0; text-align: left; vertical-align: middle; }
-    .admin-table tr:last-child td { border-bottom: none; }
-    .admin-table td small { display: block; color: #64748b; }
-    .admin-status { font-size: .8rem; font-weight: 700; border-radius: 999px; padding: 5px 10px; display: inline-block; }
-    .admin-status.Approved { background: #dcfce7; color: #166534; }
-    .admin-status.Pending { background: #fef3c7; color: #92400e; }
-    .admin-status.Blocked { background: #fee2e2; color: #991b1b; }
-    .admin-actions { display: flex; gap: 6px; flex-wrap: wrap; }
-    .admin-actions form { margin: 0; }
-    .admin-note { color: #64748b; font-size: .88rem; margin: 12px 0 0; }
-    @media(max-width: 800px) { .admin-stats { grid-template-columns: repeat(2,1fr); } .admin-form { grid-template-columns: 1fr; } }
-</style>
-<section class="admin-page">
-    <div class="admin-header">
-        <div><h1>User Administration</h1><p>Manage customer and interior designer accounts.</p></div>
+<section class="section" aria-labelledby="admin-heading">
+    <p class="eyebrow">Administrator only</p>
+    <h1 id="admin-heading">User Administration</h1>
+    <p class="section-intro">Suspend user accounts, reactivate cleared users, and verify Interior Designers before they go live.</p>
+    <p class="demo-muted">Signed in as {{ session.get('name', 'Administrator') }} · <a class="btn-sm" href="{{ url_for('logout') }}">Sign out</a></p>
+
+    <div class="demo-stats-grid" aria-label="Account statistics">
+        <div class="demo-stat"><span>Total accounts</span><strong>{{ stats.total }}</strong></div>
+        <div class="demo-stat"><span>Active</span><strong>{{ stats.active }}</strong></div>
+        <div class="demo-stat"><span>Suspended</span><strong>{{ stats.suspended }}</strong></div>
+        <div class="demo-stat"><span>Designers awaiting verification</span><strong>{{ stats.pending }}</strong></div>
     </div>
-    <div class="admin-stats">
-        <div class="admin-stat"><span>Total users</span><strong>{{ users|length }}</strong></div>
-        <div class="admin-stat"><span>Approved</span><strong>{{ users|selectattr('status', 'equalto', 'Approved')|list|length }}</strong></div>
-        <div class="admin-stat"><span>Pending</span><strong>{{ users|selectattr('status', 'equalto', 'Pending')|list|length }}</strong></div>
-        <div class="admin-stat"><span>Blocked</span><strong>{{ users|selectattr('status', 'equalto', 'Blocked')|list|length }}</strong></div>
-    </div>
-    <div class="admin-panel">
-        <h2>Add a user</h2>
-        <form class="admin-form" action="{{ url_for('admin_add') }}" method="post">
-            <div class="admin-field"><label for="new-name">Full name</label><input id="new-name" name="name" placeholder="e.g. Jane Tan" required maxlength="100"></div>
-            <div class="admin-field"><label for="new-email">Email address</label><input id="new-email" name="email" type="email" placeholder="jane@example.com" required maxlength="150"></div>
-            <div class="admin-field"><label for="new-role">Account type</label><select id="new-role" name="role"><option>Customer</option><option>Interior Designer</option></select></div>
-            <button class="admin-btn add" type="submit">+ Add user</button>
-        </form>
-        <p class="admin-note">New accounts start as Pending until approved.</p>
-    </div>
-    <div class="admin-panel">
-        <h2>User accounts</h2>
-        <div class="admin-table-wrap">
-            <table class="admin-table">
-                <thead><tr><th>User</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
-                <tbody>
-                {% for user in users %}
-                    <tr>
-                        <td><strong>{{ user.name }}</strong><small>{{ user.email }}</small></td>
-                        <td>{{ user.role }}</td>
-                        <td><span class="admin-status {{ user.status }}">{{ user.status }}</span></td>
-                        <td><div class="admin-actions">
-                            {% if user.status != 'Approved' %}
-                            <form action="{{ url_for('admin_status', user_id=user.id, status='Approved') }}" method="post"><button class="admin-btn approve" type="submit">Approve</button></form>
-                            {% endif %}
-                            {% if user.status != 'Blocked' %}
-                            <form action="{{ url_for('admin_status', user_id=user.id, status='Blocked') }}" method="post"><button class="admin-btn block" type="submit">Block</button></form>
-                            {% endif %}
-                            <form action="{{ url_for('admin_remove', user_id=user.id) }}" method="post" onsubmit="return confirm('Remove this user from the demo list?');"><button class="admin-btn remove" type="submit">Remove</button></form>
-                        </div></td>
-                    </tr>
-                {% else %}
-                    <tr><td colspan="4">No users yet. Add one above.</td></tr>
-                {% endfor %}
-                </tbody>
-            </table>
+
+    <section class="demo-subsection" aria-labelledby="pending-heading">
+        <p class="eyebrow">Review accounts</p>
+        <h2 id="pending-heading">Pending Interior Designer verification</h2>
+        <p class="section-intro">Verify only designers whose information you have reviewed. Suspended designers remain hidden until reactivated.</p>
+        {% if pending_designers %}
+        <div class="project-grid">
+            {% for designer in pending_designers %}
+            <article class="project-card demo-project-card">
+                <div class="project-info">
+                    <p class="project-type">Interior Designer · Pending</p>
+                    <h3>{{ designer.full_name }}</h3>
+                    <p>{{ designer.email }}</p>
+                    <p>Account: {{ designer.status|capitalize }} · Registered: {{ designer.created_at[:10] }}</p>
+                    <form method="post" action="{{ url_for('admin_user_action', user_id=designer.id, action='verify') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <button class="btn-sm btn-dark" type="submit">Verify designer</button>
+                    </form>
+                </div>
+            </article>
+            {% endfor %}
         </div>
-    </div>
-    <p class="admin-note">Prototype only: changes are kept in memory and reset when the server restarts. Administrator sign-in is required. This prototype is not suitable for production.</p>
+        {% else %}
+        <div class="placeholder">There are no designers awaiting verification.</div>
+        {% endif %}
+    </section>
+
+    <section class="demo-subsection" aria-labelledby="accounts-heading">
+        <p class="eyebrow">Manage access</p>
+        <h2 id="accounts-heading">Search user accounts</h2>
+        <form class="demo-filter-form" method="get" action="{{ url_for('admin_dashboard') }}" role="search" aria-label="Search user accounts">
+            <div class="demo-filter-row">
+                <div class="demo-filter-field demo-filter-search">
+                    <label class="demo-sr-only" for="admin-query">Name or email</label>
+                    <input id="admin-query" type="search" name="q" placeholder="Search accounts…" value="{{ query }}">
+                </div>
+                <div class="demo-filter-field demo-filter-property-type">
+                    <label class="demo-sr-only" for="admin-role">Account role</label>
+                    <select id="admin-role" name="role">
+                        <option value="">All roles</option>
+                        {% for role in ['Customer', 'Interior Designer', 'Platform Manager', 'Administrator'] %}
+                        <option value="{{ role }}" {% if selected_role == role %}selected{% endif %}>{{ role }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="demo-filter-field demo-filter-style">
+                    <label class="demo-sr-only" for="admin-status">Account status</label>
+                    <select id="admin-status" name="status">
+                        <option value="">All statuses</option>
+                        <option value="active" {% if selected_status == 'active' %}selected{% endif %}>Active</option>
+                        <option value="suspended" {% if selected_status == 'suspended' %}selected{% endif %}>Suspended</option>
+                    </select>
+                </div>
+                <button class="demo-filter-apply" type="submit">Search</button>
+                <a class="demo-filter-clear" href="{{ url_for('admin_dashboard') }}">Clear</a>
+            </div>
+        </form>
+        <p class="demo-results-count">{{ users|length }} matching account{{ '' if users|length == 1 else 's' }}</p>
+        <div class="project-grid">
+            {% for user in users %}
+            <article class="project-card demo-project-card">
+                <div class="project-info">
+                    <p class="project-type">{{ user.role }} · {{ user.status|capitalize }}</p>
+                    <h3>{{ user.full_name }}</h3>
+                    <p>{{ user.email }}</p>
+                    {% if user.role == 'Interior Designer' %}
+                    <p>Verification: {{ 'Verified' if user.is_verified else 'Pending' }}</p>
+                    {% endif %}
+                    {% if user.role == 'Administrator' %}
+                    <p class="demo-muted">Protected administrator account</p>
+                    {% else %}
+                        <div class="demo-filter-actions">
+                        {% if user.status == 'active' %}
+                        <form method="post" action="{{ url_for('admin_user_action', user_id=user.id, action='suspend') }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                            <button type="submit" class="btn-sm" onclick="return confirm('Suspend this account?')">Suspend</button>
+                        </form>
+                        {% else %}
+                        <form method="post" action="{{ url_for('admin_user_action', user_id=user.id, action='reactivate') }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                            <button type="submit" class="btn-sm btn-dark">Reactivate</button>
+                        </form>
+                        {% endif %}
+                        {% if user.role == 'Interior Designer' and not user.is_verified %}
+                        <form method="post" action="{{ url_for('admin_user_action', user_id=user.id, action='verify') }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                            <button type="submit" class="btn-sm">Verify designer</button>
+                        </form>
+                        {% endif %}
+                        </div>
+                    {% endif %}
+                </div>
+            </article>
+            {% else %}
+            <div class="placeholder">No matching accounts. Try adjusting the filters.</div>
+            {% endfor %}
+        </div>
+    </section>
 </section>
 {% endblock %}

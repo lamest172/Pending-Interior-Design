@@ -1,0 +1,23 @@
+{% extends "master.html" %}
+{% block title %}{{ designer.full_name }} | Pending{% endblock %}
+{% block content %}
+<section class="section">
+    <p class="eyebrow">Verified Interior Designer</p>
+    <h1>{{ designer.full_name }}</h1>
+    <p class="section-intro">Explore publicly visible projects by this verified Interior Designer.</p>
+    <div class="project-grid">
+        {% for project in projects %}
+        <article class="project-card demo-project-card">
+            <div class="project-info">
+                <p class="project-type">{{ project.style }} · {{ project.property_type }}</p>
+                <h3>{{ project.title }}</h3>
+                <p>{{ project.description }}</p>
+                <a class="btn-sm" href="{{ url_for('idp_view', project_id=project.id) }}">View project</a>
+            </div>
+        </article>
+        {% else %}
+        <div class="placeholder">No public projects have been uploaded by this designer.</div>
+        {% endfor %}
+    </div>
+</section>
+{% endblock %}
