@@ -1,7 +1,21 @@
 {% extends "master.html" %}
-
+{% block title %}Designer Registration | Pending{% endblock %}
 {% block content %}
-
-<h1>TODO: Signup webpage</h1>
-
+<section class="login-section">
+    <div class="login-card">
+        <p class="eyebrow">Interior Designer</p>
+        <h1>Create your account</h1>
+        <p class="login-intro">Your account will be pending verification until an administrator approves it.</p>
+        <form method="post" action="{{ url_for('signup') }}">
+            <label class="login-label" for="signup-name">Full name</label>
+            <input class="login-input" id="signup-name" name="full_name" required maxlength="100" placeholder="Full name">
+            <label class="login-label" for="signup-email">Email address</label>
+            <input class="login-input" id="signup-email" name="email" type="email" required maxlength="150" placeholder="you@example.com">
+            <label class="login-label" for="signup-password">Password (at least 8 characters)</label>
+            <input class="login-input" id="signup-password" name="password" type="password" required minlength="8">
+            <button class="button login-button" type="submit">Register designer</button>
+        </form>
+        <a class="back-link" href="{{ url_for('login') }}">← Back to sign in</a>
+    </div>
+</section>
 {% endblock %}

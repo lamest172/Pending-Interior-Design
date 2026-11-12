@@ -1,251 +1,115 @@
 {% extends "master.html" %}
 {% block title %}User Administration | Pending{% endblock %}
 {% block content %}
-{# This page deliberately contains its own CSS. No changes to static/style.css are needed. #}
-<style>
-  #pending-user-admin {
-    --admin-background: #f5f2eb;
-    --admin-card: #fffdf8;
-    --admin-banner: #e9e7dd;
-    --admin-border: #dedbd2;
-    --admin-ink: #293028;
-    --admin-olive: #68755d;
-    --admin-muted: #666b61;
-    padding: 60px 8% 88px;
-    background: var(--admin-background);
-    color: var(--admin-ink);
-    font: 14px/1.5 Arial, sans-serif;
-  }
-  #pending-user-admin, #pending-user-admin *, #pending-user-admin *::before, #pending-user-admin *::after { box-sizing: border-box; }
-  #pending-user-admin h1, #pending-user-admin h2, #pending-user-admin h3 { font-family: Georgia, 'Times New Roman', serif; font-weight: normal; color: var(--admin-ink); }
-  #pending-user-admin .admin-eyebrow {
-    margin: 0 0 13px; color: var(--admin-olive); font-size: 11px;
-    letter-spacing: 2px; font-weight: 700; text-transform: uppercase;
-  }
-  #pending-user-admin .admin-topline {
-    display: flex; align-items: flex-end; justify-content: space-between;
-    gap: 18px; margin-bottom: 25px;
-  }
-  #pending-user-admin .admin-title { margin: 0 0 13px; font-size: clamp(36px, 3.8vw, 48px); line-height: 1.12; }
-  #pending-user-admin .admin-intro { max-width: 570px; color: var(--admin-muted); margin: 0; font-size: 14px; line-height: 1.75; }
-  #pending-user-admin .admin-signed-in { display: flex; gap: 11px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
-  #pending-user-admin .admin-signed-in span { font-size: 12px; color: var(--admin-muted); }
-  #pending-user-admin .admin-small-link {
-    display: inline-flex; padding: 10px 15px; border: 1px solid var(--admin-border);
-    background: var(--admin-card); color: var(--admin-ink); text-decoration: none;
-    font-size: 12px; white-space: nowrap;
-  }
-  #pending-user-admin .admin-small-link:hover { background: var(--admin-banner); }
+<section class="section" aria-labelledby="admin-heading">
+    <p class="eyebrow">Administrator only</p>
+    <h1 id="admin-heading">User Administration</h1>
+    <p class="section-intro">Suspend user accounts, reactivate cleared users, and verify Interior Designers before they go live.</p>
+    <p class="demo-muted">Signed in as {{ session.get('name', 'Administrator') }} · <a class="btn-sm" href="{{ url_for('logout') }}">Sign out</a></p>
 
-  /* Flat cream cards, matching the project listings. */
-  #pending-user-admin .admin-stat-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 20px; margin: 30px 0 52px; }
-  #pending-user-admin .admin-stat-card { padding: 19px 20px 18px; min-width: 0; background: var(--admin-card); border: 1px solid var(--admin-border); }
-  #pending-user-admin .admin-stat-label { display: block; color: var(--admin-muted); font-size: 12px; }
-  #pending-user-admin .admin-stat-value { display: block; font: normal 34px/1.2 Georgia,serif; margin-top: 9px; }
-  #pending-user-admin .admin-section { margin-top: 55px; }
-  #pending-user-admin .admin-section-header { margin-bottom: 24px; }
-  #pending-user-admin .admin-section-title { font-size: clamp(29px,3vw,38px); line-height: 1.2; margin: 0 0 9px; }
-  #pending-user-admin .admin-section-description { margin: 0; max-width: 620px; color: var(--admin-muted); font-size: 14px; line-height: 1.7; }
-  #pending-user-admin .admin-card-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 20px; margin-top: 24px; }
-  #pending-user-admin .admin-person-card { display: flex; flex-direction: column; min-width: 0; border: 1px solid var(--admin-border); background: var(--admin-card); }
-  #pending-user-admin .admin-person-banner {
-    min-height: 105px; background: var(--admin-banner); display: flex;
-    align-items: center; justify-content: space-between; gap: 12px; padding: 17px 20px;
-  }
-  #pending-user-admin .admin-avatar { width: 59px; height: 59px; display: grid; place-items: center; border: 1px solid #cdd3c6; color: #586950; background: #f4f2e9; font: normal 30px Georgia,serif; }
-  #pending-user-admin .admin-account-number { align-self: flex-start; font-size: 11px; color: #7b8074; }
-  #pending-user-admin .admin-person-content { display: flex; flex-direction: column; flex: 1; padding: 18px 19px 19px; }
-  #pending-user-admin .admin-tag-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
-  #pending-user-admin .admin-tag { display: inline-block; padding: 5px 9px; background: var(--admin-banner); color: #596551; text-transform: uppercase; letter-spacing: 1px; font-size: 10px; font-weight: 700; line-height: 1.25; }
-  #pending-user-admin .admin-tag-suspended { background: #f2e3dd; color: #99513d; }
-  #pending-user-admin .admin-tag-verified { background: #e4ebdf; color: #477044; }
-  #pending-user-admin .admin-tag-pending { background: #f1e8d5; color: #8a672d; }
-  #pending-user-admin .admin-person-name { margin: 0 0 7px; font-size: 22px; line-height: 1.25; overflow-wrap: anywhere; }
-  #pending-user-admin .admin-person-email { margin: 0 0 13px; font-size: 12px; color: var(--admin-muted); overflow-wrap: anywhere; }
-  #pending-user-admin .admin-person-detail { margin: 0 0 17px; font-size: 12px; color: var(--admin-muted); }
-  #pending-user-admin .admin-person-actions { display: flex; gap: 8px; margin-top: auto; }
-  #pending-user-admin .admin-person-actions form { flex: 1; min-width: 0; margin: 0; }
-  #pending-user-admin .admin-action-button {
-    width: 100%; min-height: 38px; padding: 8px 10px; border: 1px solid var(--admin-border);
-    background: transparent; color: var(--admin-ink); font: 12px Arial,sans-serif;
-    cursor: pointer; text-align: center; transition: background .15s,border-color .15s;
-  }
-  #pending-user-admin .admin-action-button:hover { background: #f0eee7; }
-  #pending-user-admin .admin-action-primary { background: var(--admin-ink); border-color: var(--admin-ink); color: #fffdf8; }
-  #pending-user-admin .admin-action-primary:hover { background: #44513f; color: #fffdf8; }
-  #pending-user-admin .admin-action-reactivate { border-color: #b6c7aa; color: #3f6241; }
-  #pending-user-admin .admin-action-reactivate:hover { background: #e8eee2; }
-  #pending-user-admin .admin-action-danger { border-color: #dfc3b9; color: #985440; }
-  #pending-user-admin .admin-action-danger:hover { background: #f6ece6; }
-  #pending-user-admin .admin-protected { margin-top: auto; padding: 11px; border: 1px solid var(--admin-border); color: var(--admin-muted); font-size: 12px; text-align: center; }
-  #pending-user-admin .admin-empty { border: 1px dashed #b9b8aa; background: #f7f5ef; padding: 26px; margin-top: 18px; color: var(--admin-muted); }
-
-  /* The filter is one row just like the example Projects page. */
-  #pending-user-admin .admin-filter-shell {
-    border: 1px solid var(--admin-border); background: var(--admin-card);
-    padding: 12px; overflow-x: auto; -webkit-overflow-scrolling: touch;
-  }
-  #pending-user-admin .admin-filter-row {
-    display: flex; flex-wrap: nowrap; align-items: stretch; gap: 8px;
-    min-width: 670px; margin: 0;
-  }
-  #pending-user-admin .admin-filter-row input,
-  #pending-user-admin .admin-filter-row select {
-    height: 40px; margin: 0; padding: 0 11px; border: 1px solid var(--admin-border);
-    border-radius: 0; background: var(--admin-card); color: var(--admin-ink);
-    font: 12px Arial, sans-serif;
-  }
-  #pending-user-admin .admin-filter-row input { flex: 1 1 230px; min-width: 175px; }
-  #pending-user-admin .admin-filter-row select { flex: 0 0 170px; min-width: 0; }
-  #pending-user-admin .admin-filter-row button { height: 40px; padding: 0 17px; border: 0; background: var(--admin-ink); color: #fffdf8; font: 12px Arial,sans-serif; cursor: pointer; }
-  #pending-user-admin .admin-filter-row button:hover { background: #44513f; }
-  #pending-user-admin .admin-filter-clear { align-self: center; padding: 9px 10px; font-size: 12px; color: var(--admin-olive); text-decoration: none; white-space: nowrap; }
-  #pending-user-admin .admin-results-count { margin: 11px 0 20px; color: var(--admin-muted); font-size: 12px; }
-  #pending-user-admin .admin-visually-hidden { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
-  #pending-user-admin button:focus-visible, #pending-user-admin a:focus-visible, #pending-user-admin input:focus-visible, #pending-user-admin select:focus-visible { outline: 2px solid var(--admin-olive); outline-offset: 2px; }
-  #pending-user-admin .admin-last-note { margin: 27px 0 0; color: var(--admin-muted); font-size: 12px; line-height: 1.8; }
-  @media (max-width: 1050px) {
-    #pending-user-admin .admin-stat-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
-    #pending-user-admin .admin-card-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
-  }
-  @media (max-width: 680px) {
-    #pending-user-admin { padding: 40px 6% 68px; }
-    #pending-user-admin .admin-topline { display: block; }
-    #pending-user-admin .admin-signed-in { margin-top: 18px; justify-content: flex-start; }
-    #pending-user-admin .admin-card-grid { grid-template-columns: 1fr; }
-    #pending-user-admin .admin-stat-grid { gap: 10px; margin-bottom: 35px; }
-    #pending-user-admin .admin-stat-card { padding: 15px; }
-    #pending-user-admin .admin-stat-value { font-size: 29px; }
-    #pending-user-admin .admin-section { margin-top: 39px; }
-  }
-</style>
-
-<section id="pending-user-admin" aria-labelledby="admin-page-title">
-  <div class="admin-topline">
-    <div>
-      <p class="admin-eyebrow">Administrator only</p>
-      <h1 class="admin-title" id="admin-page-title">User Administration</h1>
-      <p class="admin-intro">Suspend suspected misuse, reactivate cleared users, and verify new Interior Designers before their profiles become public.</p>
+    <div class="demo-stats-grid" aria-label="Account statistics">
+        <div class="demo-stat"><span>Total accounts</span><strong>{{ stats.total }}</strong></div>
+        <div class="demo-stat"><span>Active</span><strong>{{ stats.active }}</strong></div>
+        <div class="demo-stat"><span>Suspended</span><strong>{{ stats.suspended }}</strong></div>
+        <div class="demo-stat"><span>Designers awaiting verification</span><strong>{{ stats.pending }}</strong></div>
     </div>
-    <div class="admin-signed-in">
-      <span>Signed in as <strong>{{ session.get('name', 'Administrator') }}</strong></span>
-      <a class="admin-small-link" href="{{ url_for('logout') }}">Sign out</a>
-    </div>
-  </div>
 
-  <div class="admin-stat-grid" aria-label="Account overview">
-    <div class="admin-stat-card"><span class="admin-stat-label">Total accounts</span><strong class="admin-stat-value">{{ stats.total }}</strong></div>
-    <div class="admin-stat-card"><span class="admin-stat-label">Active accounts</span><strong class="admin-stat-value">{{ stats.active }}</strong></div>
-    <div class="admin-stat-card"><span class="admin-stat-label">Suspended accounts</span><strong class="admin-stat-value">{{ stats.suspended }}</strong></div>
-    <div class="admin-stat-card"><span class="admin-stat-label">Designers awaiting verification</span><strong class="admin-stat-value">{{ stats.pending_designers }}</strong></div>
-  </div>
-
-  <section class="admin-section" aria-labelledby="admin-pending-heading">
-    <div class="admin-section-header">
-      <p class="admin-eyebrow">Account verification</p>
-      <h2 class="admin-section-title" id="admin-pending-heading">Pending Interior Designer verification</h2>
-      <p class="admin-section-description">Review new Interior Designer accounts before they can appear to customers.</p>
-    </div>
-    {% if pending_designers %}
-    <div class="admin-card-grid">
-      {% for user in pending_designers %}
-      <article class="admin-person-card">
-        <div class="admin-person-banner"><span class="admin-avatar" aria-hidden="true">{{ user.full_name[:1]|upper }}</span><span class="admin-account-number">Applicant #{{ user.id }}</span></div>
-        <div class="admin-person-content">
-          <div class="admin-tag-row"><span class="admin-tag">Interior Designer</span><span class="admin-tag admin-tag-pending">Awaiting verification</span>{% if user.status == 'suspended' %}<span class="admin-tag admin-tag-suspended">Suspended</span>{% endif %}</div>
-          <h3 class="admin-person-name">{{ user.full_name }}</h3>
-          <p class="admin-person-email">{{ user.email }}</p>
-          <p class="admin-person-detail">Registered {{ user.created_at[:10] }}</p>
-          <div class="admin-person-actions">
-            <form method="post" action="{{ url_for('admin_user_action', user_id=user.id, action='verify') }}">
-              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-              <button class="admin-action-button admin-action-primary" type="submit">Verify designer</button>
-            </form>
-          </div>
-          {% if user.status == 'suspended' %}<p class="admin-person-detail" style="margin:10px 0 0">Verification will not remove the suspension.</p>{% endif %}
+    <section class="demo-subsection" aria-labelledby="pending-heading">
+        <p class="eyebrow">Review accounts</p>
+        <h2 id="pending-heading">Pending Interior Designer verification</h2>
+        <p class="section-intro">Verify only designers whose information you have reviewed. Suspended designers remain hidden until reactivated.</p>
+        {% if pending_designers %}
+        <div class="project-grid">
+            {% for designer in pending_designers %}
+            <article class="project-card demo-project-card">
+                <div class="project-info">
+                    <p class="project-type">Interior Designer · Pending</p>
+                    <h3>{{ designer.full_name }}</h3>
+                    <p>{{ designer.email }}</p>
+                    <p>Account: {{ designer.status|capitalize }} · Registered: {{ designer.created_at[:10] }}</p>
+                    <form method="post" action="{{ url_for('admin_user_action', user_id=designer.id, action='verify') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <button class="btn-sm btn-dark" type="submit">Verify designer</button>
+                    </form>
+                </div>
+            </article>
+            {% endfor %}
         </div>
-      </article>
-      {% endfor %}
-    </div>
-    {% else %}
-      <div class="admin-empty">There are no Interior Designers awaiting verification.</div>
-    {% endif %}
-  </section>
+        {% else %}
+        <div class="placeholder">There are no designers awaiting verification.</div>
+        {% endif %}
+    </section>
 
-  <section class="admin-section" aria-labelledby="admin-users-heading">
-    <div class="admin-section-header">
-      <p class="admin-eyebrow">Account management</p>
-      <h2 class="admin-section-title" id="admin-users-heading">User accounts</h2>
-      <p class="admin-section-description">Search for a customer or designer, then manage their account status.</p>
-    </div>
-    <div class="admin-filter-shell">
-      <form class="admin-filter-row" method="get" action="{{ url_for('admin_dashboard') }}" role="search" aria-label="Search user accounts">
-        <label class="admin-visually-hidden" for="admin-q">Search names or emails</label>
-        <input id="admin-q" type="search" name="q" value="{{ query }}" placeholder="Search accounts…">
-        <label class="admin-visually-hidden" for="admin-role">Role</label>
-        <select name="role" id="admin-role">
-          <option value="">All roles</option>
-          {% for value,label in [('customer','Customer'),('designer','Interior Designer'),('platform_manager','Platform Manager'),('admin','Administrator')] %}
-            <option value="{{ value }}" {% if selected_role==value %}selected{% endif %}>{{ label }}</option>
-          {% endfor %}
-        </select>
-        <label class="admin-visually-hidden" for="admin-status">Status</label>
-        <select name="status" id="admin-status">
-          <option value="">All statuses</option>
-          <option value="active" {% if selected_status=='active' %}selected{% endif %}>Active</option>
-          <option value="suspended" {% if selected_status=='suspended' %}selected{% endif %}>Suspended</option>
-        </select>
-        <button type="submit">Search</button>
-        <a class="admin-filter-clear" href="{{ url_for('admin_dashboard') }}">Clear</a>
-      </form>
-    </div>
-    <p class="admin-results-count">{{ users|length }} matching account{{ '' if users|length == 1 else 's' }}</p>
-    {% if users %}
-    <div class="admin-card-grid">
-      {% for user in users %}
-      <article class="admin-person-card">
-        <div class="admin-person-banner"><span class="admin-avatar" aria-hidden="true">{{ user.full_name[:1]|upper }}</span><span class="admin-account-number">Account #{{ user.id }}</span></div>
-        <div class="admin-person-content">
-          <div class="admin-tag-row">
-            <span class="admin-tag">{{ user.role.replace('_',' ')|title }}</span>
-            <span class="admin-tag {{ 'admin-tag-suspended' if user.status=='suspended' else 'admin-tag-verified' }}">{{ user.status|title }}</span>
-            {% if user.role == 'designer' %}
-              <span class="admin-tag {{ 'admin-tag-verified' if user.is_verified else 'admin-tag-pending' }}">{{ 'Verified' if user.is_verified else 'Unverified' }}</span>
-            {% endif %}
-          </div>
-          <h3 class="admin-person-name">{{ user.full_name }}</h3>
-          <p class="admin-person-email">{{ user.email }}</p>
-          <div class="admin-person-actions">
-            {% if user.role == 'admin' %}
-              <div class="admin-protected" style="flex:1">Protected administrator account</div>
+    <section class="demo-subsection" aria-labelledby="accounts-heading">
+        <p class="eyebrow">Manage access</p>
+        <h2 id="accounts-heading">Search user accounts</h2>
+        <form class="demo-filter-form" method="get" action="{{ url_for('admin_dashboard') }}" role="search" aria-label="Search user accounts">
+            <div class="demo-filter-row">
+                <div class="demo-filter-field demo-filter-search">
+                    <label class="demo-sr-only" for="admin-query">Name or email</label>
+                    <input id="admin-query" type="search" name="q" placeholder="Search accounts…" value="{{ query }}">
+                </div>
+                <div class="demo-filter-field demo-filter-property-type">
+                    <label class="demo-sr-only" for="admin-role">Account role</label>
+                    <select id="admin-role" name="role">
+                        <option value="">All roles</option>
+                        {% for role in ['Customer', 'Interior Designer', 'Platform Manager', 'Administrator'] %}
+                        <option value="{{ role }}" {% if selected_role == role %}selected{% endif %}>{{ role }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="demo-filter-field demo-filter-style">
+                    <label class="demo-sr-only" for="admin-status">Account status</label>
+                    <select id="admin-status" name="status">
+                        <option value="">All statuses</option>
+                        <option value="active" {% if selected_status == 'active' %}selected{% endif %}>Active</option>
+                        <option value="suspended" {% if selected_status == 'suspended' %}selected{% endif %}>Suspended</option>
+                    </select>
+                </div>
+                <button class="demo-filter-apply" type="submit">Search</button>
+                <a class="demo-filter-clear" href="{{ url_for('admin_dashboard') }}">Clear</a>
+            </div>
+        </form>
+        <p class="demo-results-count">{{ users|length }} matching account{{ '' if users|length == 1 else 's' }}</p>
+        <div class="project-grid">
+            {% for user in users %}
+            <article class="project-card demo-project-card">
+                <div class="project-info">
+                    <p class="project-type">{{ user.role }} · {{ user.status|capitalize }}</p>
+                    <h3>{{ user.full_name }}</h3>
+                    <p>{{ user.email }}</p>
+                    {% if user.role == 'Interior Designer' %}
+                    <p>Verification: {{ 'Verified' if user.is_verified else 'Pending' }}</p>
+                    {% endif %}
+                    {% if user.role == 'Administrator' %}
+                    <p class="demo-muted">Protected administrator account</p>
+                    {% else %}
+                        <div class="demo-filter-actions">
+                        {% if user.status == 'active' %}
+                        <form method="post" action="{{ url_for('admin_user_action', user_id=user.id, action='suspend') }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                            <button type="submit" class="btn-sm" onclick="return confirm('Suspend this account?')">Suspend</button>
+                        </form>
+                        {% else %}
+                        <form method="post" action="{{ url_for('admin_user_action', user_id=user.id, action='reactivate') }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                            <button type="submit" class="btn-sm btn-dark">Reactivate</button>
+                        </form>
+                        {% endif %}
+                        {% if user.role == 'Interior Designer' and not user.is_verified %}
+                        <form method="post" action="{{ url_for('admin_user_action', user_id=user.id, action='verify') }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                            <button type="submit" class="btn-sm">Verify designer</button>
+                        </form>
+                        {% endif %}
+                        </div>
+                    {% endif %}
+                </div>
+            </article>
             {% else %}
-              {% if user.status == 'active' %}
-                <form method="post" action="{{ url_for('admin_user_action', user_id=user.id, action='suspend') }}">
-                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                  <button class="admin-action-button admin-action-danger" type="submit">Suspend</button>
-                </form>
-              {% else %}
-                <form method="post" action="{{ url_for('admin_user_action', user_id=user.id, action='unsuspend') }}">
-                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                  <button class="admin-action-button admin-action-reactivate" type="submit">Reactivate</button>
-                </form>
-              {% endif %}
-              {% if user.role == 'designer' and not user.is_verified %}
-                <form method="post" action="{{ url_for('admin_user_action', user_id=user.id, action='verify') }}">
-                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                  <button class="admin-action-button admin-action-primary" type="submit">Verify</button>
-                </form>
-              {% endif %}
-            {% endif %}
-          </div>
+            <div class="placeholder">No matching accounts. Try adjusting the filters.</div>
+            {% endfor %}
         </div>
-      </article>
-      {% endfor %}
-    </div>
-    {% else %}
-    <div class="admin-empty">No accounts match these filters. Try clearing one or more fields.</div>
-    {% endif %}
-  </section>
-  <p class="admin-last-note">Only administrators can manage accounts. Changes are saved to local SQLite storage. Reactivating a designer does not automatically verify their account.</p>
+    </section>
 </section>
 {% endblock %}
