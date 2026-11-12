@@ -82,24 +82,6 @@
         </div>
 
     </div>
-    <div class="demo-subsection">
-        <h2>Registered and verified designers</h2>
-        <p class="section-intro">Only verified, active Interior Designer accounts appear in this directory.</p>
-        <div class="project-grid">
-            {% for designer in designers %}
-            <article class="project-card demo-project-card">
-                <div class="project-info">
-                    <p class="project-type">Verified Interior Designer</p>
-                    <h3>{{ designer.full_name }}</h3>
-                    <p>Verified and available to showcase their interior design work.</p>
-                    <a class="btn-sm" href="{{ url_for('designer_view', designer_id=designer.id) }}">View designer</a>
-                </div>
-            </article>
-            {% else %}
-            <div class="placeholder">No verified registered designers are available at the moment.</div>
-            {% endfor %}
-        </div>
-    </div>
     <a class="btn-sm" style="margin-top:16px;display:inline-block;" href="{{ url_for('designers') }}">Designer directory</a>
 </section>
 <section class="section" id="projects">
@@ -154,12 +136,6 @@
         </div>
     {% endif %}
 </section>
-
-
-
-
-
-<!-- Team section: add renovation guides or articles here. -->
 <section class="section section-muted" id="about">
     <p class="eyebrow">Plan with confidence</p>
     <h2>About this demonstration</h2>
