@@ -44,6 +44,10 @@
                     <h3>{{ p.title }}</h3>
                     {% if p.is_featured %}<p style="color:#68755d;font-size:11px;font-weight:bold;">★ Featured</p>{% endif %}
                 </div>
+                <div class="counts-container">
+                    <p class="demo-muted viewership_count">👀 {{p.viewership_count}}</p>
+                    <p class="demo-muted shortlist_count">⭐ {{p.shortlist_count}}</p>
+                </div>
             </a>
             {% endfor %}
         </div>

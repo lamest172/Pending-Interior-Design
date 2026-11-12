@@ -9,9 +9,51 @@
             <h2>My Dashboard</h2>
         </div>
         <div class="dashboard-actions">
+            <a class="btn-sm" href="{{ url_for('update_weightages') }}">Edit viewership & shortlist weightage</a>
             <a class="btn-sm" href="{{ url_for('company_edit') }}">Edit Company Profile</a>
             <a class="btn-sm btn-dark" href="{{ url_for('company_preview') }}">Preview Company Page</a>
             <a class="button" href="{{ url_for('idp_new') }}">+ New Project</a>
+        </div>
+        <div class="dashboard-style-stats">
+            <button type="button" class="open-metrics-btn" onclick="openAllMetricsModal()">
+                📊 View All Style Metrics
+            </button>   
+
+            <!-- The Single Master Pop-up Modal Overlay -->
+            <div id="allMetricsModal" class="custom-modal-overlay" onclick="handleOutsideClick(event, 'allMetricsModal')">
+                <div class="modal-content large-modal">
+                    <div class="modal-header">
+                        <h3>All Style Performance Metrics</h3>
+                        <button type="button" class="icon-close-btn" onclick="closeAllMetricsModal()">&times;</button>
+                    </div>
+                    
+                    <div class="stats-list-modal">
+                        {% set current_company = company or {} %}
+                        {% set weight_views = current_company.get('weights_views', 1) %}
+                        {% set weight_short = current_company.get('weights_short', 1) %}
+
+                        {% set styles = projects | map(attribute='style') | unique | list %}
+                        
+                        {% for style in styles if style %}
+                            {% set style_projects = projects | selectattr('style', 'equalto', style) | list %}
+                            {% set view_sum = style_projects | sum(attribute='viewership_count') %}
+                            {% set short_sum = style_projects | sum(attribute='shortlist_count') %}
+                            {% set weighted_score = (view_sum * weight_views) + (short_sum * weight_short) %}
+
+                            <div class="stat-row-item">
+                                <span class="style-name">{{ style }}</span>
+                                <div class="metric-pills">
+                                    <span class="pill" title="Views">👀 {{ view_sum }}</span>
+                                    <span class="pill" title="Shortlists">⭐ {{ short_sum }}</span>
+                                    <span class="pill score-pill" title="Weighted Score">🏆 <strong>{{ "%.1f"|format(weighted_score) }}</strong></span>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+
+                    <button type="button" class="close-modal-btn" onclick="closeAllMetricsModal()">Close</button>
+                </div>
+            </div>
         </div>
     </div>
 
