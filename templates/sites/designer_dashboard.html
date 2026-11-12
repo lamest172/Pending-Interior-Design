@@ -26,24 +26,25 @@
                         <button type="button" class="icon-close-btn" onclick="closeAllMetricsModal()">&times;</button>
                     </div>
                     <div class="stats-list-modal">
-                        {% for current_company in company if company %}
-                            {% set weight_views = current_company.get('weights_views', 1) %}
-                            {% set weight_short = current_company.get('weights_short', 1) %}
-                            {% set styles = projects | map(attribute='style') | unique | list %}
-                            {% for style in styles if style %}
-                                {% set style_projects = projects | selectattr('style', 'equalto', style) | list %}
-                                {% set view_sum = style_projects | sum(attribute='viewership_count') %}
-                                {% set short_sum = style_projects | sum(attribute='shortlist_count') %}
-                                {% set weighted_score = (view_sum | float * weight_views | float) + (short_sum | float * weight_short | float) %}
-                                <div class="stat-row-item">
-                                    <span class="style-name">{{ style }}</span>
-                                    <div class="metric-pills">
-                                        <span class="pill" title="Views">👀 {{ view_sum }}</span>
-                                        <span class="pill" title="Shortlists">⭐ {{ short_sum }}</span>
-                                        <span class="pill score-pill" title="Weighted Score">🏆 <strong>{{ "%.1f"|format(weighted_score) }}</strong></span>
-                                    </div>
+                        {% set current_company = company or {} %}
+                        {% set weight_views = current_company.get('weights_views', 1) %}
+                        {% set weight_short = current_company.get('weights_short', 1) %}
+                        {% set styles = projects | map(attribute='style') | unique | list %}
+                        
+                        {% for style in styles if style %}
+                            {% set style_projects = projects | selectattr('style', 'equalto', style) | list %}
+                            {% set view_sum = style_projects | sum(attribute='viewership_count') %}
+                            {% set short_sum = style_projects | sum(attribute='shortlist_count') %}
+                            {% set weighted_score = (view_sum * weight_views) + (short_sum * weight_short) %}
+
+                            <div class="stat-row-item">
+                                <span class="style-name">{{ style }}</span>
+                                <div class="metric-pills">
+                                    <span class="pill" title="Views">👀 {{ view_sum }}</span>
+                                    <span class="pill" title="Shortlists">⭐ {{ short_sum }}</span>
+                                    <span class="pill score-pill" title="Weighted Score">🏆 <strong>{{ "%.1f"|format(weighted_score) }}</strong></span>
                                 </div>
-                            {% endfor %}
+                            </div>
                         {% endfor %}
                     </div>
                     <button type="button" class="close-modal-btn" onclick="closeAllMetricsModal()">Close</button>
@@ -55,8 +56,8 @@
     {% if not projects %}
         <div class="placeholder">No projects yet. Click "+ New Project" to get started.</div>
     {% else %}
-        <div class="idp-list">
-            {% for p in projects %}
+        <div class="idp-list" id="project-list">
+            {% for p in page_projects %}
             <div class="idp-item">
                 <div class="idp-item-info">
                     <span class="idp-title">{{ p.title }}</span>
@@ -87,6 +88,7 @@
             </div>
             {% endfor %}
         </div>
+        {% include "sites/_pagination.html" %}
     {% endif %}
 </div>
 {% endblock %}

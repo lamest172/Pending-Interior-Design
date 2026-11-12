@@ -1,0 +1,19 @@
+{% if pagination.total_pages > 1 %}
+<nav class="project-pagination" aria-label="Project pages">
+    {% if pagination.page > 1 %}
+        <a href="{{ url_for(request.endpoint, page=pagination.page - 1, **pagination.query) }}#project-list">&laquo; Previous</a>
+    {% endif %}
+
+    {% for page_number in range(1, pagination.total_pages + 1) %}
+        {% if page_number == pagination.page %}
+            <span class="current" aria-current="page">{{ page_number }}</span>
+        {% else %}
+            <a href="{{ url_for(request.endpoint, page=page_number, **pagination.query) }}#project-list">{{ page_number }}</a>
+        {% endif %}
+    {% endfor %}
+
+    {% if pagination.page < pagination.total_pages %}
+        <a href="{{ url_for(request.endpoint, page=pagination.page + 1, **pagination.query) }}#project-list">Next &raquo;</a>
+    {% endif %}
+</nav>
+{% endif %}

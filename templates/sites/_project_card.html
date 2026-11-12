@@ -25,5 +25,12 @@
             {{ '♥ Saved' if saved else '♡ Save project' }}
         </button>
     </form>
+    <div class="counts-container">
+        <p class="demo-muted viewership_count">👀 {{p.viewership_count}}</p>
+        {% if session.role == "designer" %}
+        <p class="demo-muted shortlist_count">⭐ {{p.shortlist_count}}</p>
+        {% endif %}
+    </div>
 </article>
+
 {% endmacro %}

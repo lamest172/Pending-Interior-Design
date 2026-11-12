@@ -1,0 +1,34 @@
+{% extends "master.html" %}
+{% block title %}Edit viewership & shortlist counters | Pending{% endblock%}
+
+{% block content %}
+{{company.weights_views}}
+<div class="form-page">
+    <p class="eyebrow">Interior Designer</p>
+    <h2>Company Profile</h2>
+    <form method="post" action="{{ url_for('update_weightages') }}">
+        <div class="form-group">
+            <label class="form-label ">Current Weightage Settings</label>
+            <p class="weightage-summary">
+                Viewership: <strong>{{ company.weights_views * 100 }}%</strong> | 
+                Shortlist: <strong>{{ company.weights_short * 100 }}%</strong>
+            </p>
+        </div>
+        <div class="form-group">
+            <label class="form-label" for="viewership_weight">Viewership Count Weightage (%)</label>
+            <input class="form-control" id="viewership_weight" name="views" type="number" 
+                min="0" max="100" value="{{ company.weights_views * 100 }}" placeholder="e.g. 60" required>
+        </div>
+        <div class="form-group">
+            <label class="form-label" for="shortlist_weight">Shortlist Count Weightage (%)</label>
+            <input class="form-control" id="shortlist_weight" name="short" type="number" 
+                min="0" max="100" value="{{ company.weights_short * 100 }}" placeholder="e.g. 40" required>
+        </div>
+        <div class="form-actions">
+            <button class="button" type="submit">Save Changes</button>
+            <a class="btn-sm" href="{{ url_for('designer_dashboard') }}">← Back to Dashboard</a>
+        </div>
+    </form>
+</div>
+
+{% endblock %}

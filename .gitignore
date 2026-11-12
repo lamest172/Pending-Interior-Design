@@ -2,6 +2,7 @@
 .venv/
 venv/
 env/
+.vscode
 
 # Python cache
 __pycache__/
@@ -19,3 +20,10 @@ flask_session/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Requirements.txt
+requirements.txt
+
+# Local User Admin development secret and backup files
+.pending-admin-secret
+*.before-admin.bak

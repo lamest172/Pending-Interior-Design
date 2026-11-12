@@ -87,7 +87,7 @@
                     <h4>Before</h4>
                     {% if project %}
                     <div class="photo-list">
-                        {% for photo in photos if photo.photo_type == 'BEFORE' %}
+                        {% for photo in photos if photo.photo_type == 'before' %}
                         <div class="photo-item">
                             <img src="{{ url_for('static', filename=photo.image_url) }}" alt="Before photo">
                             <form method="post"
@@ -105,7 +105,7 @@
                     <h4>After</h4>
                     {% if project %}
                     <div class="photo-list">
-                        {% for photo in photos if photo.photo_type == 'AFTER' %}
+                        {% for photo in photos if photo.photo_type == 'after' %}
                         <div class="photo-item">
                             <img src="{{ url_for('static', filename=photo.image_url) }}" alt="After photo">
                             <form method="post"
